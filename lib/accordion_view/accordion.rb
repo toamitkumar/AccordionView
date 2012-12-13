@@ -81,4 +81,19 @@ class Accordion < UIView
     end
   end
 
+  def selection_indexes=(_selection_indexes)
+    return if(@headers.size == 0)
+
+    if(not @allow_multiple_selection and _selection_indexes.size > 1)
+      _selection_indexes = NSIndexSet.indexSetWithIndex(_selection_indexes.firstIndex)
+    end
+
+
+
+  end
+
+  def selected_index=(index)
+    @selection_indexes.first
+  end
+
 end
