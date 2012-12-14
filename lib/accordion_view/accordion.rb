@@ -27,7 +27,7 @@ class Accordion < UIView
       @animation_duration         = 0.3
       @animation_curve            = UIViewAnimationCurveEaseIn
       self.autoresizesSubviews    = false
-      @selection_indexes          = []
+      # @selection_indexes          = []
 
       @scroll_view                        = UIScrollView.alloc.initWithFrame([[0, 0], [self.frame.size.with, self.frame.size.height]])
       @scroll_view                        = UIColor.clearColor
@@ -73,7 +73,7 @@ class Accordion < UIView
 
       if(header.respondsToSelector("addTarget:action:forControlEvents:"))
         header.setTag(@headers.size - 1)
-        header.addTarget(self, action:"touchDown:", forControlEvents:UIControlEventTouchUpInside)
+        header.addTarget(self, action:"touch_down:", forControlEvents:UIControlEventTouchUpInside)
       end
 
       @selected_index = 0 if(@selection_indexes.size == 0)
@@ -88,12 +88,133 @@ class Accordion < UIView
       _selection_indexes = NSIndexSet.indexSetWithIndex(_selection_indexes.firstIndex)
     end
 
+    clean_indexes = NSMutableIndexSet.new
+    _selection_indexes.enumerateIndexesUsingBlock(lambda do |index, stop|
+      return if(index > @headers.size-1)
 
+      clean_indexes.addIndex(index)
+    end)
+
+    @selection_indexes = clean_indexes
+    self.needsLayout
+
+    if(@delegate.respondsToSelector("accordion:didChangeSelection:"))
+      @delegate.accordion(self, didChangeSelection:@selection_indexes)
+    end
 
   end
 
   def selected_index=(index)
+    @selection_indexes = NSIndexSet.indexSetWithIndex(index)
+  end
+
+  def selected_index
     @selection_indexes.first
+  end
+
+  def set_original_size(size, forIndex:index)
+    return if(index >= @views.size)
+
+    @original_sizes[index] = NSValue.valueWithCGSize(size)
+    
+    self.setNeedsLayout if(@selection_indexes.containsIndex(index))
+  end
+
+  def touch_down(sender)
+    if(@allow_multiple_selection)
+      temp_copy = @selection_indexes.mutableCopy
+
+      if(@selection_indexes.containsIndex(sender.tag))
+        temp_copy.removeIndex(sender.tag)
+      else
+        temp_copy.addIndex(sender.tag)
+      end
+      @selection_indexes = temp_copy
+    else
+      @selected_index = sender.tag
+    end
+  end
+
+  def animation_done
+    @views.each_with_index do |view, index|
+      view.setHidden(true) unless(@selection_indexes.containsIndex(index)
+    end
+  end
+
+  def layoutSubviews
+    height = 0
+    @views.each_with_index do |view, index|
+      original_size = @original_sizes[index]
+      view_frame = @views[index].frame
+      header_frame = @headers[index].frame
+      header_frame.origin.y = height
+      height += header_frame.size.height
+      view_frame.origin.y = height
+
+      if(@selection_indexes.containsIndex(index))
+        view_frame.size.height = original_size.height
+        @views[index].setFrame(CGRectMake(0, view_frame.origin.y, self.frame.size.width, 0))
+        @views[index].setHidden(false)
+      else
+        view_frame.size.height = 0
+      end
+
+      height += view_frame.size.height
+
+      if(not CGRectEqualToRect(@views[index].frame, view_frame) or not CGRectEqualToRect(@headers[index].frame, header_frame))
+        UIView.beginAnimations(nil, context:nil)
+        UIView.setAnimationDelegate(self)
+        UIView.setAnimationDidStopSelector("anitmation_done:")
+        UIView.setAnimationDuration(@animation_duration)
+        UIView.setAnimationCurve(@animation_curve)
+        UIView.setAnimationBeginsFromCurrentState(true)
+        @headers[index].setFrame(header_frame)
+        @views[index].setFrame(view_frame)
+        UIView.commitAnimations
+      end
+
+      offset = @scroll_view.contentOffset
+
+      UIView.beginAnimations(nil, context:nil)
+      UIView.setAnimationDuration(@animation_duration)
+      UIView.setAnimationCurve(@animation_curve)
+      UIView.setAnimationBeginsFromCurrentState(true)
+      @scroll_view.setContentSize(self.frame.size.width, height)
+      UIView.commitAnimations
+
+      if(offset.y + @scroll_view.size.height > height)
+        offset.y = height - @scroll_view.frame.size.height
+        offset.y = 0 if(offset.y < 0)
+      end
+      
+      @scroll_view.setContentOffset(offset, animates:true)
+      self.scrollViewDidScroll(@scroll_view)
+    end
+  end
+
+  def scrollViewDidScroll(_scroll_view)
+    @views.each_with_index do |view, index|
+      if(view.frame.size.height > 0)
+        header = @headers[index]
+        content = view.frame
+
+        content.origin.y -= header.frame.size.height
+        content.size.height += header.frame.size.height
+
+        frame = header.frame
+
+        if (CGRectContainsPoint(content, _scroll_view.contentOffset))
+          if (_scroll_view.contentOffset.y < content.origin.y + content.size.height - frame.size.height)
+            frame.origin.y = _scroll_view.contentOffset.y
+          else
+            frame.origin.y = content.origin.y + content.size.height - frame.size.height
+          end
+        else
+          frame.origin.y = view.frame.origin.y - frame.size.height
+        end
+        header.frame = frame
+      end
+    end
   end
 
 end
