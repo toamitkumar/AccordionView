@@ -18,7 +18,7 @@ class Accordion < UIView
 
   def initWithFrame(frame) 
     
-    if(super.initWithFrame(frame))
+    if(super)
       @views                      = []
       @headers                    = []
       @original_sizes             = []
@@ -27,10 +27,10 @@ class Accordion < UIView
       @animation_duration         = 0.3
       @animation_curve            = UIViewAnimationCurveEaseIn
       self.autoresizesSubviews    = false
-      # @selection_indexes          = []
+      @selection_indexes          = NSIndexSet.new
 
-      @scroll_view                        = UIScrollView.alloc.initWithFrame([[0, 0], [self.frame.size.with, self.frame.size.height]])
-      @scroll_view                        = UIColor.clearColor
+      @scroll_view                        = UIScrollView.alloc.initWithFrame([[0, 0], [self.frame.size.width, self.frame.size.height]])
+      @scroll_view.backgroundColor        = UIColor.clearColor
       @scroll_view.userInteractionEnabled = true
       @scroll_view.autoresizesSubviews    = false
       @scroll_view.scrollsToTop           = false
@@ -50,22 +50,24 @@ class Accordion < UIView
     if(header and view)
       
       @headers                  << header
-      @view                     << view
+      @views                    << view
       @original_sizes           << NSValue.valueWithCGSize(view.frame.size)
-      view.setAutoresizingMask  = UIViewAutoresizingNone
-      view.setClipsToBounds     = true
+      view.setAutoresizingMask(UIViewAutoresizingNone)
+      view.setClipsToBounds(true)
 
       # modify the width of the header to the width of accordion
       frame = header.frame
       frame.origin.x = 0
       frame.size.width = self.frame.size.width
       header.setFrame(frame)
+      # header.rounded_corners
 
       # modify the width of the body to the width of accordion
       frame = view.frame
       frame.origin.x = 0
       frame.size.width = self.frame.size.width
       view.setFrame(frame)
+      # view.rounded_corners
 
 
       @scroll_view.addSubview(header)
@@ -76,15 +78,15 @@ class Accordion < UIView
         header.addTarget(self, action:"touch_down:", forControlEvents:UIControlEventTouchUpInside)
       end
 
-      @selected_index = 0 if(@selection_indexes.size == 0)
+      set_selected_index(0) if(@selection_indexes.count == 0)
 
     end
   end
 
-  def selection_indexes=(_selection_indexes)
+  def set_selection_indexes(_selection_indexes)
     return if(@headers.size == 0)
 
-    if(not @allow_multiple_selection and _selection_indexes.size > 1)
+    if(not @allow_multiple_selection and _selection_indexes.count > 1)
       _selection_indexes = NSIndexSet.indexSetWithIndex(_selection_indexes.firstIndex)
     end
 
@@ -96,7 +98,7 @@ class Accordion < UIView
     end)
 
     @selection_indexes = clean_indexes
-    self.needsLayout
+    self.setNeedsLayout
 
     if(@delegate.respondsToSelector("accordion:didChangeSelection:"))
       @delegate.accordion(self, didChangeSelection:@selection_indexes)
@@ -104,8 +106,8 @@ class Accordion < UIView
 
   end
 
-  def selected_index=(index)
-    @selection_indexes = NSIndexSet.indexSetWithIndex(index)
+  def set_selected_index(index)
+    set_selection_indexes(NSIndexSet.indexSetWithIndex(index))
   end
 
   def selected_index
@@ -129,22 +131,22 @@ class Accordion < UIView
       else
         temp_copy.addIndex(sender.tag)
       end
-      @selection_indexes = temp_copy
+      set_selection_indexes(temp_copy)
     else
-      @selected_index = sender.tag
+      set_selected_index(sender.tag)
     end
   end
 
   def animation_done
     @views.each_with_index do |view, index|
-      view.setHidden(true) unless(@selection_indexes.containsIndex(index)
+      view.setHidden(true) unless(@selection_indexes.containsIndex(index))
     end
   end
 
   def layoutSubviews
     height = 0
     @views.each_with_index do |view, index|
-      original_size = @original_sizes[index]
+      original_size = @original_sizes[index].CGSizeValue
       view_frame = @views[index].frame
       header_frame = @headers[index].frame
       header_frame.origin.y = height
@@ -164,7 +166,7 @@ class Accordion < UIView
       if(not CGRectEqualToRect(@views[index].frame, view_frame) or not CGRectEqualToRect(@headers[index].frame, header_frame))
         UIView.beginAnimations(nil, context:nil)
         UIView.setAnimationDelegate(self)
-        UIView.setAnimationDidStopSelector("anitmation_done:")
+        UIView.setAnimationDidStopSelector("animation_done:")
         UIView.setAnimationDuration(@animation_duration)
         UIView.setAnimationCurve(@animation_curve)
         UIView.setAnimationBeginsFromCurrentState(true)
@@ -179,7 +181,7 @@ class Accordion < UIView
       UIView.setAnimationDuration(@animation_duration)
       UIView.setAnimationCurve(@animation_curve)
       UIView.setAnimationBeginsFromCurrentState(true)
-      @scroll_view.setContentSize(self.frame.size.width, height)
+      @scroll_view.setContentSize(CGSizeMake(self.frame.size.width, height))
       UIView.commitAnimations
 
       if(offset.y + @scroll_view.size.height > height)
@@ -187,7 +189,7 @@ class Accordion < UIView
         offset.y = 0 if(offset.y < 0)
       end
       
-      @scroll_view.setContentOffset(offset, animates:true)
+      @scroll_view.setContentOffset(offset, animated:true)
       self.scrollViewDidScroll(@scroll_view)
     end
   end

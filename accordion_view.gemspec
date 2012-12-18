@@ -15,6 +15,6 @@ Gem::Specification.new do |gem|
   gem.require_paths = ["lib"]
   gem.version       = AccordionView::VERSION
 
-  s.add_dependency "bubble-wrap"
-  s.add_development_dependency 'rake'
+  gem.add_dependency "bubble-wrap"
+  gem.add_development_dependency 'rake'
 end
