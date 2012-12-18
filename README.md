@@ -18,7 +18,7 @@ Or install it yourself as:
 
 ## Usage
 
-TODO: Write usage instructions here
+For usage check the [sample application](https://github.com/toamitkumar/AccordionUIView)
 
 ## Contributing
 
